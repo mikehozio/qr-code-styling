@@ -50,7 +50,7 @@ export default class QRCornerSquare {
       ...args,
       draw: () => {
         this._element = this._window.document.createElementNS("http://www.w3.org/2000/svg", "path");
-        this._element.setAttribute("clip-rule", "evenodd");
+        this._element.setAttribute("fill-rule", "evenodd");
         this._element.setAttribute(
           "d",
           `M ${x + size / 2} ${y}` + // M cx, y //  Move to top of ring
@@ -72,7 +72,7 @@ export default class QRCornerSquare {
       ...args,
       draw: () => {
         this._element = this._window.document.createElementNS("http://www.w3.org/2000/svg", "path");
-        this._element.setAttribute("clip-rule", "evenodd");
+        this._element.setAttribute("fill-rule", "evenodd");
         this._element.setAttribute(
           "d",
           `M ${x} ${y}` +
@@ -98,7 +98,7 @@ export default class QRCornerSquare {
       ...args,
       draw: () => {
         this._element = this._window.document.createElementNS("http://www.w3.org/2000/svg", "path");
-        this._element.setAttribute("clip-rule", "evenodd");
+        this._element.setAttribute("fill-rule", "evenodd");
         this._element.setAttribute(
           "d",
           `M ${x} ${y + 2.5 * dotSize}` +

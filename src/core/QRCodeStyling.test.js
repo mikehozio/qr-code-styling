@@ -79,17 +79,12 @@ describe("Test QRCodeStyling class", () => {
         width: 300,
         height: 300,
         data: "TEST",
-        image:
-          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAQAAAAnOwc2AAAAEUlEQVR42mNk+M+AARiHsiAAcCIKAYwFoQ8AAAAASUVORK5CYII=",
         dotsOptions: {
           color: "#4267b2",
           type: "rounded"
         },
         backgroundOptions: {
           color: "#e9ebee"
-        },
-        imageOptions: {
-          saveAsBlob: false
         }
       });
       qrCode.getRawData("svg").then((buffer) => {
