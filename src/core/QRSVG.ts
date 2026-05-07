@@ -2,6 +2,7 @@ import calculateImageSize from "../tools/calculateImageSize";
 import toDataUrl from "../tools/toDataUrl";
 import errorCorrectionPercents from "../constants/errorCorrectionPercents";
 import QRDot from "../figures/dot/QRDot";
+import { buildDotsPath } from "../tools/buildDotsPath";
 import QRCornerSquare, { availableCornerSquareTypes } from "../figures/cornerSquare/QRCornerSquare";
 import QRCornerDot, { availableCornerDotTypes } from "../figures/cornerDot/QRCornerDot";
 import { RequiredOptions } from "./QROptions";
@@ -186,12 +187,6 @@ export default class QRSVG {
     const dotSize = this._roundSize(realQRSize / count);
     const xBeginning = this._roundSize((options.width - count * dotSize) / 2);
     const yBeginning = this._roundSize((options.height - count * dotSize) / 2);
-    const dot = new QRDot({
-      svg: this._element,
-      type: options.dotsOptions.type,
-      window: this._window
-    });
-
     const dotsGroup = this._window.document.createElementNS("http://www.w3.org/2000/svg", "g");
     const fill = this._createColor({
       options: options.dotsOptions?.gradient,
@@ -204,38 +199,28 @@ export default class QRSVG {
       name: `dot-color-${this._instanceId}`
     });
     dotsGroup.setAttribute("fill", fill);
-    dotsGroup.setAttribute("stroke", fill);
-    dotsGroup.setAttribute("stroke-width", "1");
     this._element.appendChild(dotsGroup);
     this._dotsGroup = dotsGroup;
 
-    for (let row = 0; row < count; row++) {
-      for (let col = 0; col < count; col++) {
-        if (filter && !filter(row, col)) {
-          continue;
-        }
-        if (!this._qr?.isDark(row, col)) {
-          continue;
-        }
-
-        dot.draw(
-          xBeginning + col * dotSize,
-          yBeginning + row * dotSize,
-          dotSize,
-          (xOffset: number, yOffset: number): boolean => {
-            if (col + xOffset < 0 || row + yOffset < 0 || col + xOffset >= count || row + yOffset >= count) return false;
-            if (filter && !filter(row + yOffset, col + xOffset)) return false;
-            return !!this._qr && this._qr.isDark(row + yOffset, col + xOffset);
-          }
-        );
-
-        if (dot._element && this._dotsGroup) {
-          this._dotsGroup.appendChild(dot._element);
-        }
-      }
-    }
+    const dotsPath = this._window.document.createElementNS("http://www.w3.org/2000/svg", "path");
+    dotsPath.setAttribute(
+      "d",
+      buildDotsPath(
+        (row, col) => {
+          if (filter && !filter(row, col)) return false;
+          return !!this._qr?.isDark(row, col);
+        },
+        count,
+        dotSize,
+        xBeginning,
+        yBeginning,
+        options.dotsOptions.type
+      )
+    );
+    dotsGroup.appendChild(dotsPath);
 
     if (options.shape === shapeTypes.circle) {
+      const dot = new QRDot({ svg: this._element, type: options.dotsOptions.type, window: this._window });
       const additionalDots = this._roundSize((minSize / dotSize - count) / 2);
       const fakeCount = count + additionalDots * 2;
       const xFakeBeginning = xBeginning - additionalDots * dotSize;
