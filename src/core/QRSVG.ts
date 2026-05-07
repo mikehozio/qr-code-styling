@@ -50,7 +50,7 @@ export default class QRSVG {
     this._element.setAttribute("width", String(options.width));
     this._element.setAttribute("height", String(options.height));
     this._element.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
-    if (!options.dotsOptions.roundSize) {
+    if (options.dotsOptions.roundSize) {
       this._element.setAttribute("shape-rendering", "crispEdges");
     }
     this._element.setAttribute("viewBox", `0 0 ${options.width} ${options.height}`);
@@ -204,6 +204,8 @@ export default class QRSVG {
       name: `dot-color-${this._instanceId}`
     });
     dotsGroup.setAttribute("fill", fill);
+    dotsGroup.setAttribute("stroke", fill);
+    dotsGroup.setAttribute("stroke-width", "1");
     this._element.appendChild(dotsGroup);
     this._dotsGroup = dotsGroup;
 
@@ -333,6 +335,8 @@ export default class QRSVG {
           name: `corners-square-color-${column}-${row}-${this._instanceId}`
         });
         newGroup.setAttribute("fill", fill);
+        newGroup.setAttribute("stroke", fill);
+        newGroup.setAttribute("stroke-width", "1");
         this._element.appendChild(newGroup);
         cornersSquareGroup = newGroup;
         cornersDotGroup = newGroup;
@@ -390,6 +394,8 @@ export default class QRSVG {
           name: `corners-dot-color-${column}-${row}-${this._instanceId}`
         });
         newGroup.setAttribute("fill", fill);
+        newGroup.setAttribute("stroke", fill);
+        newGroup.setAttribute("stroke-width", "1");
         this._element.appendChild(newGroup);
         cornersDotGroup = newGroup;
       }
