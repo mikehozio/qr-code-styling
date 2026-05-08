@@ -8,6 +8,30 @@ function edgeDir(fromCr: number, fromCc: number, toCr: number, toCc: number): nu
   return 3;
 }
 
+// At a CW boundary corner exiting in `curDir`, the cell whose edge we are about to
+// traverse (the "owning cell" for QRDot-style per-cell decisions). Deterministic
+// even at pinch corners, since each cycle visits with its own curDir.
+function ownerCell(cr: number, cc: number, curDir: number): [number, number] {
+  switch (curDir) {
+    case 0: return [cr,     cc];        // RIGHT → top edge of (cr, cc)
+    case 1: return [cr,     cc - 1];    // DOWN  → right edge of (cr, cc-1)
+    case 2: return [cr - 1, cc - 1];    // LEFT  → bottom edge of (cr-1, cc-1)
+    default: return [cr - 1, cc];       // UP    → left edge of (cr-1, cc)
+  }
+}
+
+function neighborPattern(
+  r: number, c: number, matrix: boolean[][], count: number
+): { left: boolean; right: boolean; top: boolean; bottom: boolean; n: number } {
+  const isF = (rr: number, cc: number) =>
+    rr >= 0 && rr < count && cc >= 0 && cc < count && matrix[rr][cc];
+  const left   = isF(r,     c - 1);
+  const right  = isF(r,     c + 1);
+  const top    = isF(r - 1, c);
+  const bottom = isF(r + 1, c);
+  return { left, right, top, bottom, n: +left + +right + +top + +bottom };
+}
+
 function circlePath(cx: number, cy: number, r: number): string {
   return `M ${cx - r} ${cy} a ${r} ${r} 0 1 0 ${2 * r} 0 a ${r} ${r} 0 1 0 ${-2 * r} 0`;
 }
@@ -58,7 +82,9 @@ function cornerSegment(
   dotSize: number,
   dotType: DotType,
   px: (cc: number) => number,
-  py: (cr: number) => number
+  py: (cr: number) => number,
+  matrix: boolean[][],
+  count: number
 ): string[] {
   const x = px(cc);
   const y = py(cr);
@@ -85,7 +111,16 @@ function cornerSegment(
   }
 
   if (dotType === "extra-rounded") {
-    const r = dotSize;
+    // Per-cell adaptive radius matching QRDot's _drawExtraRounded:
+    //   1 neighbor          → r = dotSize/2  (matches _basicSideRounded)
+    //   2 perpendicular     → r = dotSize    (matches _basicCornerExtraRounded)
+    // Other neighbor counts don't produce outer convex corners.
+    const [or, oc] = ownerCell(cr, cc, curDir);
+    const { left, right, top, bottom, n } = neighborPattern(or, oc, matrix, count);
+    let r = dotSize / 2;
+    if (n === 2 && !(left && right) && !(top && bottom)) {
+      r = dotSize;
+    }
     const [bx, by] = backupPoint(x, y, prevDir, r);
     const [ex, ey] = exitPoint(x, y, curDir, r);
     return [`L ${bx} ${by}`, `a ${r} ${r} 0 0 1 ${ex - bx} ${ey - by}`];
@@ -143,7 +178,9 @@ function cornersToPath(
   dotSize: number,
   xBeginning: number,
   yBeginning: number,
-  dotType: DotType
+  dotType: DotType,
+  matrix: boolean[][],
+  count: number
 ): string {
   const n = corners.length;
   if (n === 0) return "";
@@ -177,7 +214,7 @@ function cornersToPath(
     const curDir = dirs[i];
     if (prevDir === curDir) continue; // collinear — skip intermediate point
     const [cr, cc] = corners[i];
-    segments.push(...cornerSegment(cr, cc, prevDir, curDir, dotSize, dotType, px, py));
+    segments.push(...cornerSegment(cr, cc, prevDir, curDir, dotSize, dotType, px, py, matrix, count));
   }
 
   segments.push("Z");
@@ -293,14 +330,21 @@ export function buildDotsPath(
       });
     };
 
+    // Each cell contributes at most 4 boundary edges; this is a strict upper bound
+    // on the number of edges any single cycle can walk. Acts as a circuit breaker
+    // in case the walker invariant is ever broken by a future change.
+    const maxSteps = cells.length * 4 + 8;
+
     for (const [startCorner, outgoings] of edgeMap) {
       for (const startOut of outgoings) {
         if (walkedEdges.has(edKey(startCorner, startOut))) continue;
         const corners: [number, number][] = [];
         let cur = startCorner;
         let curOut = startOut;
+        let steps = 0;
 
         while (true) {
+          if (++steps > maxSteps) break; // defensive: should be unreachable
           const [cr, cc] = cur.split(",").map(Number);
           corners.push([cr, cc]);
           walkedEdges.add(edKey(cur, curOut));
@@ -315,7 +359,7 @@ export function buildDotsPath(
           curOut = pickNext(ncr, ncc, inDir, available);
         }
 
-        parts.push(cornersToPath(corners, dotSize, xBeginning, yBeginning, dotType));
+        parts.push(cornersToPath(corners, dotSize, xBeginning, yBeginning, dotType, matrix, count));
       }
     }
   }
