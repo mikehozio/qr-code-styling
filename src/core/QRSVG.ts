@@ -1,7 +1,6 @@
 import calculateImageSize from "../tools/calculateImageSize";
 import toDataUrl from "../tools/toDataUrl";
 import errorCorrectionPercents from "../constants/errorCorrectionPercents";
-import QRDot from "../figures/dot/QRDot";
 import { buildDotsPath } from "../tools/buildDotsPath";
 import QRCornerSquare, { availableCornerSquareTypes } from "../figures/cornerSquare/QRCornerSquare";
 import QRCornerDot, { availableCornerDotTypes } from "../figures/cornerDot/QRCornerDot";
@@ -54,9 +53,13 @@ export default class QRSVG {
     if (options.dotsOptions.roundSize) {
       this._element.setAttribute("shape-rendering", "crispEdges");
     }
+    this._element.setAttribute("data-build", "buildDotsPath");
     this._element.setAttribute("viewBox", `0 0 ${options.width} ${options.height}`);
     this._defs = this._window.document.createElementNS("http://www.w3.org/2000/svg", "defs");
     this._element.appendChild(this._defs);
+    const desc = this._window.document.createElementNS("http://www.w3.org/2000/svg", "desc");
+    desc.textContent = "build:buildDotsPath";
+    this._element.appendChild(desc);
     this._imageUri = options.image;
     this._instanceId = QRSVG.instanceCount++;
     this._options = options;
@@ -220,7 +223,6 @@ export default class QRSVG {
     dotsGroup.appendChild(dotsPath);
 
     if (options.shape === shapeTypes.circle) {
-      const dot = new QRDot({ svg: this._element, type: options.dotsOptions.type, window: this._window });
       const additionalDots = this._roundSize((minSize / dotSize - count) / 2);
       const fakeCount = count + additionalDots * 2;
       const xFakeBeginning = xBeginning - additionalDots * dotSize;
@@ -256,23 +258,19 @@ export default class QRSVG {
         }
       }
 
-      for (let row = 0; row < fakeCount; row++) {
-        for (let col = 0; col < fakeCount; col++) {
-          if (!fakeMatrix[row][col]) continue;
-
-          dot.draw(
-            xFakeBeginning + col * dotSize,
-            yFakeBeginning + row * dotSize,
-            dotSize,
-            (xOffset: number, yOffset: number): boolean => {
-              return !!fakeMatrix[row + yOffset]?.[col + xOffset];
-            }
-          );
-          if (dot._element && this._dotsGroup) {
-            this._dotsGroup.appendChild(dot._element);
-          }
-        }
-      }
+      const fakePath = this._window.document.createElementNS("http://www.w3.org/2000/svg", "path");
+      fakePath.setAttribute(
+        "d",
+        buildDotsPath(
+          (row, col) => !!fakeMatrix[row][col],
+          fakeCount,
+          dotSize,
+          xFakeBeginning,
+          yFakeBeginning,
+          options.dotsOptions.type
+        )
+      );
+      dotsGroup.appendChild(fakePath);
     }
   }
 
@@ -320,8 +318,6 @@ export default class QRSVG {
           name: `corners-square-color-${column}-${row}-${this._instanceId}`
         });
         newGroup.setAttribute("fill", fill);
-        newGroup.setAttribute("stroke", fill);
-        newGroup.setAttribute("stroke-width", "1");
         this._element.appendChild(newGroup);
         cornersSquareGroup = newGroup;
         cornersDotGroup = newGroup;
@@ -340,30 +336,19 @@ export default class QRSVG {
           cornersSquareGroup.appendChild(cornersSquare._element);
         }
       } else {
-        const dot = new QRDot({
-          svg: this._element,
-          type: (options.cornersSquareOptions?.type as DotType) || options.dotsOptions.type,
-          window: this._window
-        });
-
-        for (let row = 0; row < squareMask.length; row++) {
-          for (let col = 0; col < squareMask[row].length; col++) {
-            if (!squareMask[row]?.[col]) {
-              continue;
-            }
-
-            dot.draw(
-              x + col * dotSize,
-              y + row * dotSize,
-              dotSize,
-              (xOffset: number, yOffset: number): boolean => !!squareMask[row + yOffset]?.[col + xOffset]
-            );
-
-            if (dot._element && cornersSquareGroup) {
-              cornersSquareGroup.appendChild(dot._element);
-            }
-          }
-        }
+        const cornerSquarePath = this._window.document.createElementNS("http://www.w3.org/2000/svg", "path");
+        cornerSquarePath.setAttribute(
+          "d",
+          buildDotsPath(
+            (row, col) => !!squareMask[row]?.[col],
+            squareMask.length,
+            dotSize,
+            x,
+            y,
+            (options.cornersSquareOptions?.type as DotType) || options.dotsOptions.type
+          )
+        );
+        if (cornersSquareGroup) cornersSquareGroup.appendChild(cornerSquarePath);
       }
 
       if (options.cornersDotOptions?.gradient || options.cornersDotOptions?.color) {
@@ -379,8 +364,6 @@ export default class QRSVG {
           name: `corners-dot-color-${column}-${row}-${this._instanceId}`
         });
         newGroup.setAttribute("fill", fill);
-        newGroup.setAttribute("stroke", fill);
-        newGroup.setAttribute("stroke-width", "1");
         this._element.appendChild(newGroup);
         cornersDotGroup = newGroup;
       }
@@ -398,30 +381,19 @@ export default class QRSVG {
           cornersDotGroup.appendChild(cornersDot._element);
         }
       } else {
-        const dot = new QRDot({
-          svg: this._element,
-          type: (options.cornersDotOptions?.type as DotType) || options.dotsOptions.type,
-          window: this._window
-        });
-
-        for (let row = 0; row < dotMask.length; row++) {
-          for (let col = 0; col < dotMask[row].length; col++) {
-            if (!dotMask[row]?.[col]) {
-              continue;
-            }
-
-            dot.draw(
-              x + col * dotSize,
-              y + row * dotSize,
-              dotSize,
-              (xOffset: number, yOffset: number): boolean => !!dotMask[row + yOffset]?.[col + xOffset]
-            );
-
-            if (dot._element && cornersDotGroup) {
-              cornersDotGroup.appendChild(dot._element);
-            }
-          }
-        }
+        const cornerDotPath = this._window.document.createElementNS("http://www.w3.org/2000/svg", "path");
+        cornerDotPath.setAttribute(
+          "d",
+          buildDotsPath(
+            (row, col) => !!dotMask[row]?.[col],
+            dotMask.length,
+            dotSize,
+            x,
+            y,
+            (options.cornersDotOptions?.type as DotType) || options.dotsOptions.type
+          )
+        );
+        if (cornersDotGroup) cornersDotGroup.appendChild(cornerDotPath);
       }
     });
   }
