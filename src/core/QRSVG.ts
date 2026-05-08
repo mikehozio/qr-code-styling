@@ -53,13 +53,9 @@ export default class QRSVG {
     if (options.dotsOptions.roundSize) {
       this._element.setAttribute("shape-rendering", "crispEdges");
     }
-    this._element.setAttribute("data-build", "buildDotsPath");
     this._element.setAttribute("viewBox", `0 0 ${options.width} ${options.height}`);
     this._defs = this._window.document.createElementNS("http://www.w3.org/2000/svg", "defs");
     this._element.appendChild(this._defs);
-    const desc = this._window.document.createElementNS("http://www.w3.org/2000/svg", "desc");
-    desc.textContent = "build:buildDotsPath";
-    this._element.appendChild(desc);
     this._imageUri = options.image;
     this._instanceId = QRSVG.instanceCount++;
     this._options = options;
