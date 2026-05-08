@@ -253,32 +253,70 @@ export function buildDotsPath(
       continue;
     }
 
-    // Multi-cell component: build directed boundary edge map
-    // Corner (r,c) → next corner (clockwise, filled region always to the right)
+    // Multi-cell component: build directed boundary edge map.
+    // Diagonal "pinch" corners (two diagonally-adjacent filled cells with neither
+    // orthogonal neighbor filled) generate two outgoing edges from the same corner,
+    // so we store string[] instead of string to handle that without Map collisions.
     const cellSet = new Set(cells.map(([r, c]) => key(r, c)));
     const inComp = (r: number, c: number) => cellSet.has(key(r, c));
-    const edgeMap = new Map<string, string>();
+    const edgeMap = new Map<string, string[]>();
+
+    const addEdge = (from: string, to: string) => {
+      const arr = edgeMap.get(from);
+      if (arr) arr.push(to);
+      else edgeMap.set(from, [to]);
+    };
 
     for (const [r, c] of cells) {
-      if (!inComp(r - 1, c)) edgeMap.set(key(r,     c),     key(r,     c + 1)); // top    → RIGHT
-      if (!inComp(r, c + 1)) edgeMap.set(key(r,     c + 1), key(r + 1, c + 1)); // right  → DOWN
-      if (!inComp(r + 1, c)) edgeMap.set(key(r + 1, c + 1), key(r + 1, c));     // bottom → LEFT
-      if (!inComp(r, c - 1)) edgeMap.set(key(r + 1, c),     key(r,     c));     // left   → UP
+      if (!inComp(r - 1, c)) addEdge(key(r,     c),     key(r,     c + 1)); // top    → RIGHT
+      if (!inComp(r, c + 1)) addEdge(key(r,     c + 1), key(r + 1, c + 1)); // right  → DOWN
+      if (!inComp(r + 1, c)) addEdge(key(r + 1, c + 1), key(r + 1, c));     // bottom → LEFT
+      if (!inComp(r, c - 1)) addEdge(key(r + 1, c),     key(r,     c));     // left   → UP
     }
 
-    // Walk all closed cycles in the edge map (outer boundary + any holes)
-    const walked = new Set<string>();
-    for (const startKey of edgeMap.keys()) {
-      if (walked.has(startKey)) continue;
-      const corners: [number, number][] = [];
-      let cur = startKey;
-      do {
-        const [cr, cc] = cur.split(",").map(Number);
-        corners.push([cr, cc]);
-        walked.add(cur);
-        cur = edgeMap.get(cur)!;
-      } while (cur !== startKey);
-      parts.push(cornersToPath(corners, dotSize, xBeginning, yBeginning, dotType));
+    // Walk all closed cycles. Each directed half-edge "from>to" is walked at most once.
+    // At pinch corners (two outgoing edges) we always pick the most-clockwise available
+    // turn (right-hand rule), which correctly resolves the crossing.
+    const walkedEdges = new Set<string>();
+    const edKey = (from: string, to: string) => `${from}>${to}`;
+
+    const pickNext = (ncr: number, ncc: number, inDir: number, candidates: string[]): string => {
+      if (candidates.length === 1) return candidates[0];
+      return candidates.reduce((best, cand) => {
+        const [br, bc] = best.split(",").map(Number);
+        const [cr2, cc2] = cand.split(",").map(Number);
+        const bestTurn = (edgeDir(ncr, ncc, br, bc) - inDir + 4) % 4;
+        const candTurn = (edgeDir(ncr, ncc, cr2, cc2) - inDir + 4) % 4;
+        // right-turn(1) > straight(0) > left-turn(3) > U-turn(2)
+        const pri = (v: number) => v === 1 ? 0 : v === 0 ? 1 : v === 3 ? 2 : 3;
+        return pri(candTurn) < pri(bestTurn) ? cand : best;
+      });
+    };
+
+    for (const [startCorner, outgoings] of edgeMap) {
+      for (const startOut of outgoings) {
+        if (walkedEdges.has(edKey(startCorner, startOut))) continue;
+        const corners: [number, number][] = [];
+        let cur = startCorner;
+        let curOut = startOut;
+
+        while (true) {
+          const [cr, cc] = cur.split(",").map(Number);
+          corners.push([cr, cc]);
+          walkedEdges.add(edKey(cur, curOut));
+          const [outR, outC] = curOut.split(",").map(Number);
+          const inDir = edgeDir(cr, cc, outR, outC);
+          cur = curOut;
+          if (cur === startCorner) break;
+          const [ncr, ncc] = cur.split(",").map(Number);
+          const outs = edgeMap.get(cur) ?? [];
+          const available = outs.filter(t => !walkedEdges.has(edKey(cur, t)));
+          if (available.length === 0) break;
+          curOut = pickNext(ncr, ncc, inDir, available);
+        }
+
+        parts.push(cornersToPath(corners, dotSize, xBeginning, yBeginning, dotType));
+      }
     }
   }
 
