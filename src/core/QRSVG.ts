@@ -50,7 +50,7 @@ export default class QRSVG {
     this._element.setAttribute("width", String(options.width));
     this._element.setAttribute("height", String(options.height));
     this._element.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
-    if (options.dotsOptions.roundSize) {
+    if (!options.dotsOptions.roundSize) {
       this._element.setAttribute("shape-rendering", "crispEdges");
     }
     this._element.setAttribute("viewBox", `0 0 ${options.width} ${options.height}`);
