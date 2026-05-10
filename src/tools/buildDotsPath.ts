@@ -57,12 +57,12 @@ function singleCellPath(
   }
 
   if (dotType === "classy" || dotType === "classy-rounded") {
-    // Two-opposite-corners shape: matches _basicCornersRounded (rotation=PI/2)
-    // bottom-left corner rounded, top-right corner rounded
+    // QRDot 0-neighbor case for both classy and classyRounded:
+    // _basicCornersRounded(rotation = π/2) — top-left + bottom-right rounded (r = s/2).
     return (
-      `M ${x} ${y}` +
-      ` v ${half} a ${half} ${half} 0 0 0 ${half} ${half}` +
-      ` h ${half} v ${-half} a ${half} ${half} 0 0 0 ${-half} ${-half}`
+      `M ${x + s} ${y}` +
+      ` h ${-half} a ${half} ${half} 0 0 0 ${-half} ${half}` +
+      ` v ${half} h ${half} a ${half} ${half} 0 0 0 ${half} ${-half} Z`
     );
   }
 
@@ -129,21 +129,17 @@ function cornerSegment(
   if (dotType === "classy" || dotType === "classy-rounded") {
     // classy/classyRounded only cut two specific diagonal corners:
     //   UP→RIGHT (top-left outer corner) and DOWN→LEFT (bottom-right outer corner)
-    // All other outer convex corners are sharp.
+    // All other outer convex corners are sharp. Matches QRDot._drawClassy's
+    // !leftN&&!topN / !rightN&&!bottomN branches.
     const isClassyCut = (prevDir === 3 && curDir === 0) || (prevDir === 1 && curDir === 2);
     if (!isClassyCut) return [`L ${x} ${y}`];
 
-    const r = dotSize / 2;
+    // classy → _basicCornerRounded (r = dotSize/2)
+    // classy-rounded → _basicCornerExtraRounded (r = dotSize)
+    const r = dotType === "classy" ? dotSize / 2 : dotSize;
     const [bx, by] = backupPoint(x, y, prevDir, r);
     const [ex, ey] = exitPoint(x, y, curDir, r);
-
-    if (dotType === "classy") {
-      // Straight diagonal cut
-      return [`L ${bx} ${by}`, `L ${ex} ${ey}`];
-    } else {
-      // Quadratic bezier through the corner point
-      return [`L ${bx} ${by}`, `Q ${x} ${y} ${ex} ${ey}`];
-    }
+    return [`L ${bx} ${by}`, `a ${r} ${r} 0 0 1 ${ex - bx} ${ey - by}`];
   }
 
   return [`L ${x} ${y}`];
